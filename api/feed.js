@@ -12,30 +12,32 @@ module.exports = async (req, res) => {
     
     // 2. Transformace položek
     const transformedItems = shopItems.map(item => {
-      // Logika kategorií: nejdelší cesta nebo "Ostatní"
+      // Logika kategorií
       let categories = item.CATEGORYTEXT || [];
-      let bestCategory = "";
-      if (categories.length > 0) {
-        bestCategory = categories.sort((a, b) => b.length - a.length)[0];
-      }
-      if (!bestCategory || bestCategory.trim() === "" || bestCategory.trim() === ";") {
-        bestCategory = "Ostatní";
-      }
+      let bestCategory = categories.length > 0 ? categories.sort((a, b) => b.length - a.length)[0] : "Ostatní";
+      if (!bestCategory || bestCategory.trim() === "" || bestCategory.trim() === ";") bestCategory = "Ostatní";
 
-      // Logika značky: Vždy DOPS, pokud MANUFACTURER chybí
+      // Logika značky
       let brand = item.MANUFACTURER && item.MANUFACTURER[0] !== "" ? item.MANUFACTURER[0] : "DOPS";
 
-      // Logika obrázků: Optimalizace přes wsrv.nl (funguje lépe než ImageKit bez registrace)
+      // Logika obrázků
       let originalImg = item.IMGURL ? item.IMGURL[0] : "";
       let optimizedImg = originalImg;
       if (originalImg.startsWith('https://www.dops.cz/')) {
-        // encodeURIComponent je klíčový, aby se URL nesekla
         optimizedImg = `https://wsrv.nl/?url=${encodeURIComponent(originalImg)}&w=600&h=600&fit=contain&bg=white`;
+      }
+
+      // OPRAVA: Definice podrobného názvu (Title)
+      let fullTitle = "";
+      if (item.PRODUCT && item.PRODUCT[0]) {
+        fullTitle = item.PRODUCT[0];
+      } else if (item.PRODUCTNAME && item.PRODUCTNAME[0]) {
+        fullTitle = item.PRODUCTNAME[0];
       }
 
       return {
         identity: item.ID[0],
-        title: item.PRODUCTNAME ? item.PRODUCTNAME[0] : item.PRODUCT[0],
+        title: fullTitle, 
         web_url: item.URL[0],
         price: `${item.PRICE_VAT[0]} Kč`,
         availability: 1,
@@ -52,10 +54,10 @@ module.exports = async (req, res) => {
       };
     });
 
-    // 3. Sestavení nového XML
+    // 3. Sestavení nového XML (Builder definován jen jednou)
     const builder = new xml2js.Builder({
       rootName: 'items',
-      cdata: true // Důležité pro zachování HTML v popisech
+      cdata: true 
     });
 
     const finalXml = builder.buildObject({ item: transformedItems });
