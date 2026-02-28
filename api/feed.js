@@ -19,23 +19,21 @@ module.exports = async (req, res) => {
         bestCategory = categories.sort((a, b) => b.length - a.length)[0];
       }
 
-      // Logika dostupnosti: 1 = skladem, 15 = nedostupné (pro Luigi's Box ranking)
-      // Kontrolujeme, zda je v AVAILABILITY "1" nebo číslo 1
-      const isAvailable = item.AVAILABILITY && (item.AVAILABILITY[0] === "1" || item.AVAILABILITY[0] === 1);
+      // Vše je skladem, takže nastavujeme isAvailable vždy na true
+      const isAvailable = true; 
 
       return {
         identity: item.ID[0],
         title: item.PRODUCTNAME ? item.PRODUCTNAME[0] : item.PRODUCT[0],
         web_url: item.URL[0],
         price: `${item.PRICE_VAT[0]} Kč`,
-        // Oprava chyby: posíláme ranky, které LB lépe chápe
-        availability: isAvailable ? 1 : 0,
-        availability_rank: isAvailable ? 1 : 15,
-        availability_rank_text: isAvailable ? "Skladem" : "Není skladem",
+        // Hodnoty pro Luigi's Box: 1 = skladem / nejvyšší priorita
+        availability: 1,
+        availability_rank: 1,
+        availability_rank_text: "Skladem",
         image_link_l: item.IMGURL ? item.IMGURL[0] : "",
         description: item.DESCRIPTION ? item.DESCRIPTION[0] : "",
         ean: item.EAN ? item.EAN[0] : "",
-        // Pokud je výrobce prázdný, LB to prostě ignoruje
         brand: item.MANUFACTURER && item.MANUFACTURER[0] !== "" ? item.MANUFACTURER[0] : "",
         category: {
           $: { primary: "true" },
