@@ -3,18 +3,16 @@ const xml2js = require('xml2js');
 
 module.exports = async (req, res) => {
   try {
+    // 1. Stáhnout původní XML
     const response = await axios.get('https://www.dops.cz/editor/filestore/io_folder/luigisbox.xml');
     const parser = new xml2js.Parser({ explicitArray: true });
     const result = await parser.parseStringPromise(response.data);
 
     const shopItems = result.SHOP.SHOPITEM;
     
-    // Nastavení pro ImageKit (můžete si vytvořit vlastní účet pro plnou kontrolu, 
-    // nebo zkusit tuto proxy metodu pro demo)
-    const IMAGEKIT_URL = "https://ik.imagekit.io/demo/tr:w-600,h-600,cm-pad_resize,bg-FFFFFF/";
-
+    // 2. Transformace položek
     const transformedItems = shopItems.map(item => {
-      // 1. Logika kategorií
+      // Logika kategorií: nejdelší cesta nebo "Ostatní"
       let categories = item.CATEGORYTEXT || [];
       let bestCategory = "";
       if (categories.length > 0) {
@@ -24,16 +22,15 @@ module.exports = async (req, res) => {
         bestCategory = "Ostatní";
       }
 
-      // 2. Logika značky (vždy DOPS)
+      // Logika značky: Vždy DOPS, pokud MANUFACTURER chybí
       let brand = item.MANUFACTURER && item.MANUFACTURER[0] !== "" ? item.MANUFACTURER[0] : "DOPS";
 
-      // 3. Logika obrázků (SMUSH / RESIZE)
+      // Logika obrázků: Optimalizace přes wsrv.nl (funguje lépe než ImageKit bez registrace)
       let originalImg = item.IMGURL ? item.IMGURL[0] : "";
       let optimizedImg = originalImg;
-      
-      if (originalImg.includes('https://www.dops.cz/')) {
-        // Změníme URL na optimalizovanou verzi přes ImageKit
-        optimizedImg = IMAGEKIT_URL + originalImg;
+      if (originalImg.startsWith('https://www.dops.cz/')) {
+        // encodeURIComponent je klíčový, aby se URL nesekla
+        optimizedImg = `https://wsrv.nl/?url=${encodeURIComponent(originalImg)}&w=600&h=600&fit=contain&bg=white`;
       }
 
       return {
@@ -44,7 +41,7 @@ module.exports = async (req, res) => {
         availability: 1,
         availability_rank: 1,
         availability_rank_text: "Skladem",
-        image_link_l: optimizedImg, // Teď už zmenšený a lehký obrázek
+        image_link_l: optimizedImg, 
         description: item.DESCRIPTION ? item.DESCRIPTION[0] : "",
         ean: item.EAN ? item.EAN[0] : "",
         brand: brand,
@@ -55,13 +52,15 @@ module.exports = async (req, res) => {
       };
     });
 
+    // 3. Sestavení nového XML
     const builder = new xml2js.Builder({
       rootName: 'items',
-      cdata: true
+      cdata: true // Důležité pro zachování HTML v popisech
     });
 
     const finalXml = builder.buildObject({ item: transformedItems });
 
+    // 4. Odeslání odpovědi
     res.setHeader('Content-Type', 'application/xml');
     res.status(200).send(finalXml);
     
