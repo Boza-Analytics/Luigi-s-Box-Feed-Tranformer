@@ -12,24 +12,30 @@ module.exports = async (req, res) => {
     
     // 2. Transformace položek
     const transformedItems = shopItems.map(item => {
-      // Vyčištění kategorií (získání té nejdelší/nejdetailnější cesty)
+      // Vyčištění kategorií
       let categories = item.CATEGORYTEXT || [];
-      // Odstranění duplicit a krátkých cest, pokud existuje delší verze
       let bestCategory = "";
       if (categories.length > 0) {
-        // Seřadíme od nejdelšího řetězce a vezmeme ten s "|"
         bestCategory = categories.sort((a, b) => b.length - a.length)[0];
       }
+
+      // Logika dostupnosti: 1 = skladem, 15 = nedostupné (pro Luigi's Box ranking)
+      // Kontrolujeme, zda je v AVAILABILITY "1" nebo číslo 1
+      const isAvailable = item.AVAILABILITY && (item.AVAILABILITY[0] === "1" || item.AVAILABILITY[0] === 1);
 
       return {
         identity: item.ID[0],
         title: item.PRODUCTNAME ? item.PRODUCTNAME[0] : item.PRODUCT[0],
         web_url: item.URL[0],
         price: `${item.PRICE_VAT[0]} Kč`,
-        availability: item.AVAILABILITY[0],
-        image_link_l: item.IMGURL[0],
+        // Oprava chyby: posíláme ranky, které LB lépe chápe
+        availability: isAvailable ? 1 : 0,
+        availability_rank: isAvailable ? 1 : 15,
+        availability_rank_text: isAvailable ? "Skladem" : "Není skladem",
+        image_link_l: item.IMGURL ? item.IMGURL[0] : "",
         description: item.DESCRIPTION ? item.DESCRIPTION[0] : "",
         ean: item.EAN ? item.EAN[0] : "",
+        // Pokud je výrobce prázdný, LB to prostě ignoruje
         brand: item.MANUFACTURER && item.MANUFACTURER[0] !== "" ? item.MANUFACTURER[0] : "",
         category: {
           $: { primary: "true" },
@@ -41,7 +47,7 @@ module.exports = async (req, res) => {
     // 3. Sestavení nového XML
     const builder = new xml2js.Builder({
       rootName: 'items',
-      cdata: true
+      cdata: true // Obalí texty do CDATA sekcí
     });
 
     const finalXml = builder.buildObject({ item: transformedItems });
