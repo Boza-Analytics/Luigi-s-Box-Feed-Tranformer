@@ -23,11 +23,23 @@ module.exports = async (req, res) => {
     
     // 3. Vytvořit category elementy
     const categoryElements = Array.from(categorySet).map((cat, index) => {
-      // Vytvoříme jednoduchý identifikátor z názvu kategorie
-      const categoryId = cat
+      // Rozdělit kategorii podle | a vzít pouze poslední část
+      const categoryParts = cat.split('|').map(part => part.trim()).filter(part => part !== '');
+      const lastCategory = categoryParts.length > 0 ? categoryParts[categoryParts.length - 1] : cat;
+      
+      // Vytvoříme URL slug z poslední části kategorie
+      const categorySlug = lastCategory
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+      
+      // Vytvoříme ID z celé kategorie (pro jedinečnost)
+      const categoryId = cat
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
         .replace(/\|/g, '-')
         .replace(/[^a-z0-9-]/g, '-')
         .replace(/-+/g, '-')
@@ -36,7 +48,7 @@ module.exports = async (req, res) => {
       return {
         identity: categoryId || `category-${index + 1}`,
         title: cat,
-        web_url: `https://www.dops.cz/kategorie/${categoryId || `category-${index + 1}`}`
+        web_url: `https://www.dops.cz/${categorySlug || `category-${index + 1}`}`
       };
     });
     
