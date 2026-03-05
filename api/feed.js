@@ -18,12 +18,15 @@ module.exports = async (req, res) => {
         bestCategory = "Ostatní";
       }
       
-      // Normalizovat kategorii s mezerami kolem |
-      const normalizedCategory = bestCategory
+      // Vzít pouze poslední část kategorie
+      const categoryParts = bestCategory
         .split('|')
         .map(part => part.trim())
-        .filter(part => part !== '')
-        .join(' | ');
+        .filter(part => part !== '');
+      
+      const finalCategory = categoryParts.length > 0 
+        ? categoryParts[categoryParts.length - 1]
+        : "Ostatní";
       
       // Logika značky
       let brand = item.MANUFACTURER && item.MANUFACTURER[0] !== "" ? item.MANUFACTURER[0] : "DOPS";
@@ -55,7 +58,7 @@ module.exports = async (req, res) => {
         description: item.DESCRIPTION ? item.DESCRIPTION[0] : "",
         ean: item.EAN ? item.EAN[0] : "",
         brand: brand,
-        category: normalizedCategory  // OPRAVENO: použití normalizované kategorie
+        category: finalCategory  // Pouze poslední část kategorie
       };
     });
     
