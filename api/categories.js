@@ -9,8 +9,8 @@ module.exports = async (req, res) => {
     const result = await parser.parseStringPromise(response.data);
     const shopItems = result.SHOP.SHOPITEM;
     
-    // 2. Extrahovat všechny unikátní kategorie
-    const categorySet = new Set();
+    // 2. Extrahovat všechny kategorie a rozložit je na jednotlivé úrovně
+    const categoryHierarchies = new Set();
     
     shopItems.forEach(item => {
       let categories = item.CATEGORYTEXT || [];
@@ -19,35 +19,35 @@ module.exports = async (req, res) => {
         bestCategory = "Ostatní";
       }
       
-      // Vzít maximálně poslední 2 úrovně kategorie
       const categoryParts = bestCategory
         .split('|')
         .map(part => part.trim())
         .filter(part => part !== '');
       
-      const finalCategory = categoryParts.length > 2
-        ? categoryParts.slice(-2).join(' | ')  // Poslední 2 úrovně
-        : categoryParts.join(' | ');            // Všechny, pokud je méně než 2
-      
-      categorySet.add(finalCategory || "Ostatní");
+      // Přidat všechny úrovně hierarchie
+      // Např. "A | B | C" vytvoří: "A", "A | B", "A | B | C"
+      for (let i = 0; i < categoryParts.length; i++) {
+        const path = categoryParts.slice(0, i + 1).join(' | ');
+        categoryHierarchies.add(path);
+      }
     });
     
-    // 3. Vytvořit category elementy
-    const categoryElements = Array.from(categorySet).map((cat, index) => {
-      // Rozdělit kategorii podle | a vzít pouze poslední část pro URL
-      const categoryParts = cat.split('|').map(part => part.trim()).filter(part => part !== '');
-      const lastCategory = categoryParts.length > 0 ? categoryParts[categoryParts.length - 1] : cat;
+    // 3. Vytvořit category elementy s hierarchy podle Luigi's Box formátu
+    const categoryElements = Array.from(categoryHierarchies).map((fullPath) => {
+      const parts = fullPath.split(' | ').map(p => p.trim());
+      const categoryTitle = parts[parts.length - 1]; // Poslední část = title
+      const hierarchy = parts.length > 1 ? parts.slice(0, -1).join(' | ') : null; // Cesta K této kategorii (bez ní)
       
-      // Vytvoříme URL slug z poslední části kategorie
-      const categorySlug = lastCategory
+      // URL slug z poslední části
+      const categorySlug = categoryTitle
         .toLowerCase()
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+        .replace(/[\u0300-\u036f]/g, '')
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
       
-      // Vytvoříme ID z celé kategorie (pro jedinečnost)
-      const categoryId = cat
+      // ID z celé cesty
+      const categoryId = fullPath
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
@@ -56,11 +56,18 @@ module.exports = async (req, res) => {
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '');
       
-      return {
-        identity: categoryId || `category-${index + 1}`,
-        title: cat,  // Maximálně 2 úrovně, např. "Plotové sloupky a vzpěry | Betonové sloupky"
-        web_url: `https://www.dops.cz/${categorySlug || `category-${index + 1}`}`
+      const categoryObj = {
+        identity: categoryId,
+        title: categoryTitle,
+        web_url: `https://www.dops.cz/${categorySlug}`
       };
+      
+      // Přidat hierarchy pouze pokud není top-level (podle Luigi's Box dokumentace)
+      if (hierarchy) {
+        categoryObj.hierarchy = hierarchy;
+      }
+      
+      return categoryObj;
     });
     
     // 4. Sestavení XML pro kategorie
