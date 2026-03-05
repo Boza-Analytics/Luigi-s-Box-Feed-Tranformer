@@ -19,41 +19,46 @@ module.exports = async (req, res) => {
         bestCategory = "Ostatní";
       }
       
-      // Vzít pouze poslední část kategorie
+      // Vzít maximálně poslední 2 úrovně kategorie
       const categoryParts = bestCategory
         .split('|')
         .map(part => part.trim())
         .filter(part => part !== '');
       
-      const finalCategory = categoryParts.length > 0 
-        ? categoryParts[categoryParts.length - 1]
-        : "Ostatní";
+      const finalCategory = categoryParts.length > 2
+        ? categoryParts.slice(-2).join(' | ')  // Poslední 2 úrovně
+        : categoryParts.join(' | ');            // Všechny, pokud je méně než 2
       
-      categorySet.add(finalCategory);
+      categorySet.add(finalCategory || "Ostatní");
     });
     
     // 3. Vytvořit category elementy
     const categoryElements = Array.from(categorySet).map((cat, index) => {
-      // Vytvoříme URL slug z názvu kategorie
-      const categorySlug = cat
+      // Rozdělit kategorii podle | a vzít pouze poslední část pro URL
+      const categoryParts = cat.split('|').map(part => part.trim()).filter(part => part !== '');
+      const lastCategory = categoryParts.length > 0 ? categoryParts[categoryParts.length - 1] : cat;
+      
+      // Vytvoříme URL slug z poslední části kategorie
+      const categorySlug = lastCategory
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
       
-      // Vytvoříme ID z názvu kategorie
+      // Vytvoříme ID z celé kategorie (pro jedinečnost)
       const categoryId = cat
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s*\|\s*/g, '-')
         .replace(/[^a-z0-9-]/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '');
       
       return {
         identity: categoryId || `category-${index + 1}`,
-        title: cat,  // Pouze poslední část, např. "Betonové sloupky"
+        title: cat,  // Maximálně 2 úrovně, např. "Plotové sloupky a vzpěry | Betonové sloupky"
         web_url: `https://www.dops.cz/${categorySlug || `category-${index + 1}`}`
       };
     });
