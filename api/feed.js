@@ -14,7 +14,16 @@ module.exports = async (req, res) => {
       // Logika kategorií
       let categories = item.CATEGORYTEXT || [];
       let bestCategory = categories.length > 0 ? categories.sort((a, b) => b.length - a.length)[0] : "Ostatní";
-      if (!bestCategory || bestCategory.trim() === "" || bestCategory.trim() === ";") bestCategory = "Ostatní";
+      if (!bestCategory || bestCategory.trim() === "" || bestCategory.trim() === ";") {
+        bestCategory = "Ostatní";
+      }
+      
+      // Normalizovat kategorii s mezerami kolem |
+      const normalizedCategory = bestCategory
+        .split('|')
+        .map(part => part.trim())
+        .filter(part => part !== '')
+        .join(' | ');
       
       // Logika značky
       let brand = item.MANUFACTURER && item.MANUFACTURER[0] !== "" ? item.MANUFACTURER[0] : "DOPS";
@@ -46,7 +55,7 @@ module.exports = async (req, res) => {
         description: item.DESCRIPTION ? item.DESCRIPTION[0] : "",
         ean: item.EAN ? item.EAN[0] : "",
         brand: brand,
-        category: bestCategory  // Changed: now just a string value
+        category: normalizedCategory  // OPRAVENO: použití normalizované kategorie
       };
     });
     
@@ -61,7 +70,8 @@ module.exports = async (req, res) => {
     const builder = new xml2js.Builder({
       rootName: 'items',
       cdata: true,
-      headless: false
+      headless: false,
+      xmldec: { version: '1.0', encoding: 'UTF-8' }
     });
     
     // Build structure with both item and category at root level
@@ -73,7 +83,7 @@ module.exports = async (req, res) => {
     const finalXml = builder.buildObject(feedStructure);
     
     // 5. Odeslání odpovědi
-    res.setHeader('Content-Type', 'application/xml');
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
     res.status(200).send(finalXml);
     
   } catch (error) {
