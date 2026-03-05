@@ -18,7 +18,15 @@ module.exports = async (req, res) => {
       if (!bestCategory || bestCategory.trim() === "" || bestCategory.trim() === ";") {
         bestCategory = "Ostatní";
       }
-      categorySet.add(bestCategory);
+      
+      // Normalizovat kategorie s mezerami kolem |
+      const normalizedCategory = bestCategory
+        .split('|')
+        .map(part => part.trim())
+        .filter(part => part !== '')
+        .join(' | ');
+      
+      categorySet.add(normalizedCategory);
     });
     
     // 3. Vytvořit category elementy
@@ -40,7 +48,7 @@ module.exports = async (req, res) => {
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/\|/g, '-')
+        .replace(/\s*\|\s*/g, '-')
         .replace(/[^a-z0-9-]/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '');
