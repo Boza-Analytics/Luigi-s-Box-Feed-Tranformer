@@ -18,15 +18,15 @@ module.exports = async (req, res) => {
         bestCategory = "Ostatní";
       }
       
-      // Vzít pouze poslední část kategorie
+      // Vzít maximálně poslední 2 úrovně kategorie
       const categoryParts = bestCategory
         .split('|')
         .map(part => part.trim())
         .filter(part => part !== '');
       
-      const finalCategory = categoryParts.length > 0 
-        ? categoryParts[categoryParts.length - 1]
-        : "Ostatní";
+      const finalCategory = categoryParts.length > 2
+        ? categoryParts.slice(-2).join(' | ')  // Poslední 2 úrovně
+        : categoryParts.join(' | ');            // Všechny, pokud je méně než 2
       
       // Logika značky
       let brand = item.MANUFACTURER && item.MANUFACTURER[0] !== "" ? item.MANUFACTURER[0] : "DOPS";
@@ -58,7 +58,7 @@ module.exports = async (req, res) => {
         description: item.DESCRIPTION ? item.DESCRIPTION[0] : "",
         ean: item.EAN ? item.EAN[0] : "",
         brand: brand,
-        category: finalCategory  // Pouze poslední část kategorie
+        category: finalCategory || "Ostatní"
       };
     });
     
