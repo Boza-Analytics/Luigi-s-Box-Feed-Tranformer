@@ -11,22 +11,19 @@ module.exports = async (req, res) => {
     
     // 2. Transformace položek
     const transformedItems = shopItems.map(item => {
-      // Logika kategorií
+      // Logika kategorií - PLNÁ CESTA (všechny úrovně)
       let categories = item.CATEGORYTEXT || [];
       let bestCategory = categories.length > 0 ? categories.sort((a, b) => b.length - a.length)[0] : "Ostatní";
       if (!bestCategory || bestCategory.trim() === "" || bestCategory.trim() === ";") {
         bestCategory = "Ostatní";
       }
       
-      // Vzít maximálně poslední 2 úrovně kategorie
-      const categoryParts = bestCategory
+      // Normalizovat kategorii s mezerami kolem | (PLNÁ CESTA)
+      const normalizedCategory = bestCategory
         .split('|')
         .map(part => part.trim())
-        .filter(part => part !== '');
-      
-      const finalCategory = categoryParts.length > 2
-        ? categoryParts.slice(-2).join(' | ')  // Poslední 2 úrovně
-        : categoryParts.join(' | ');            // Všechny, pokud je méně než 2
+        .filter(part => part !== '')
+        .join(' | ');
       
       // Logika značky
       let brand = item.MANUFACTURER && item.MANUFACTURER[0] !== "" ? item.MANUFACTURER[0] : "DOPS";
@@ -58,18 +55,11 @@ module.exports = async (req, res) => {
         description: item.DESCRIPTION ? item.DESCRIPTION[0] : "",
         ean: item.EAN ? item.EAN[0] : "",
         brand: brand,
-        category: finalCategory || "Ostatní"
+        category: normalizedCategory  // PLNÁ CESTA - např. "Pletivo, ploty a oplocení | Plotové sloupky a vzpěry | Betonové sloupky"
       };
     });
     
-    // 3. Extract unique categories for separate category elements
-    const uniqueCategories = [...new Set(transformedItems.map(item => item.category))];
-    const categoryElements = uniqueCategories.map(cat => ({
-      $: { primary: "true" },
-      _: cat
-    }));
-    
-    // 4. Sestavení nového XML s items a categories jako siblings
+    // 3. Sestavení XML - POUZE items
     const builder = new xml2js.Builder({
       rootName: 'items',
       cdata: true,
@@ -77,15 +67,9 @@ module.exports = async (req, res) => {
       xmldec: { version: '1.0', encoding: 'UTF-8' }
     });
     
-    // Build structure with both item and category at root level
-    const feedStructure = {
-      item: transformedItems,
-      category: categoryElements
-    };
+    const finalXml = builder.buildObject({ item: transformedItems });
     
-    const finalXml = builder.buildObject(feedStructure);
-    
-    // 5. Odeslání odpovědi
+    // 4. Odeslání odpovědi
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');
     res.status(200).send(finalXml);
     
